@@ -150,9 +150,9 @@ release.
 <a href="doc/changelogs/CHANGELOG_V6.md#6.1.0">Moved to doc/changelogs/CHANGELOG_V6.md#6.1.0</a>.
 
 ## 2016-05-05, Version 5.11.1 (Stable), @evanlucas
-
+s
 <a href="doc/changelogs/CHANGELOG_V5.md#5.11.1">Moved to doc/changelogs/CHANGELOG_V5.md#5.11.1</a>.
-
+s
 ## 2016-05-05, Version 4.4.4 'Argon' (LTS), @thealphanerd
 
 <a href="doc/changelogs/CHANGELOG_V4.md#4.4.4">Moved to doc/changelogs/CHANGELOG_V4.md#4.4.4</a>.
