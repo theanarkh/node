@@ -115,8 +115,9 @@ void TCPWrap::Initialize(Local<Object> target,
   NODE_DEFINE_CONSTANT(constants, SOCKET);
   NODE_DEFINE_CONSTANT(constants, SERVER);
   NODE_DEFINE_CONSTANT(constants, UV_TCP_IPV6ONLY);
+  #if defined(SO_REUSEPORT) && defined(__linux__) 
   NODE_DEFINE_CONSTANT(constants, UV_TCP_REUSEPORT);
-  
+  #endif
   target->Set(context,
               env->constants_string(),
               constants).Check();
@@ -230,7 +231,7 @@ void TCPWrap::Bind(
   if (family == AF_INET6 &&
       !args[2]->Uint32Value(env->context()).To(&flags)) {
     return;
-  } else if (family == AF_INET4 &&
+  } else if (family == AF_INET &&
       !args[2]->Uint32Value(env->context()).To(&flags)) {
     return;
   }

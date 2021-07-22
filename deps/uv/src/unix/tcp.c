@@ -165,7 +165,7 @@ int uv__tcp_bind(uv_tcp_t* tcp,
     return UV__ERR(errno);
   #if defined(SO_REUSEPORT) && defined(__linux__) 
     on = 1;
-    if (setsockopt(tcp->io_watcher.fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)))
+    if ((flags & UV_TCP_REUSEPORT) && setsockopt(tcp->io_watcher.fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)))
       return UV__ERR(errno);
   #endif
 #ifndef __OpenBSD__
