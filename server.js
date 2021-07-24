@@ -20,5 +20,5 @@ if (cluster.isPrimary) {
   http.createServer((req, res) => {
       process.send(process.pid);
       res.end('hello');
-  }).listen({reuseport: false, port: 8000});
+  }).listen({reuseport: true, port: 8000});
 }
