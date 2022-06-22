@@ -1497,6 +1497,8 @@ class Environment : public MemoryRetainer {
   template <typename T>
   void ForEachBindingData(T&& iterator);
 
+  void SwapAddons(std::list<binding::DLib>* addons);
+
  private:
   inline void ThrowError(v8::Local<v8::Value> (*fun)(v8::Local<v8::String>),
                          const char* errmsg);

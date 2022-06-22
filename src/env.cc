@@ -528,12 +528,12 @@ Environment::~Environment() {
   // them; with Worker threads, we have the opportunity to be stricter.
   // Also, since the main thread usually stops just before the process exits,
   // this is far less relevant here.
-  if (!is_main_thread()) {
-    // Dereference all addons that were loaded into this environment.
-    for (binding::DLib& addon : loaded_addons_) {
-      addon.Close();
-    }
-  }
+  // if (!is_main_thread()) {
+  //   // Dereference all addons that were loaded into this environment.
+  //   for (binding::DLib& addon : loaded_addons_) {
+  //     addon.Close();
+  //   }
+  // }
 
   CHECK_EQ(base_object_count_, 0);
 }
@@ -1729,6 +1729,10 @@ void Environment::MemoryInfo(MemoryTracker* tracker) const {
 
 void Environment::RunWeakRefCleanup() {
   isolate()->ClearKeptObjects();
+}
+
+void Environment::SwapAddons(std::list<binding::DLib>* addons) {
+  addons->swap(loaded_addons_);
 }
 
 // Not really any better place than env.cc at this moment.

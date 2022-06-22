@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include "node_messaging.h"
 #include "uv.h"
+#include "node_binding.h"
 
 namespace node {
 

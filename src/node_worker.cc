@@ -261,114 +261,123 @@ void Worker::Run() {
 
   Debug(this, "Creating isolate for worker with id %llu", thread_id_.id);
 
-  WorkerThreadData data(this);
-  if (isolate_ == nullptr) return;
-  CHECK(data.loop_is_usable());
-
-  Debug(this, "Starting worker with id %llu", thread_id_.id);
+  std::list<binding::DLib> addons;
   {
-    Locker locker(isolate_);
-    Isolate::Scope isolate_scope(isolate_);
-    SealHandleScope outer_seal(isolate_);
+    WorkerThreadData data(this);
+    if (isolate_ == nullptr) return;
+    CHECK(data.loop_is_usable());
 
-    DeleteFnPtr<Environment, FreeEnvironment> env_;
-    auto cleanup_env = OnScopeLeave([&]() {
-      // TODO(addaleax): This call is harmless but should not be necessary.
-      // Figure out why V8 is raising a DCHECK() here without it
-      // (in test/parallel/test-async-hooks-worker-asyncfn-terminate-4.js).
-      isolate_->CancelTerminateExecution();
-
-      if (!env_) return;
-      env_->set_can_call_into_js(false);
-
-      {
-        Mutex::ScopedLock lock(mutex_);
-        stopped_ = true;
-        this->env_ = nullptr;
-      }
-
-      env_.reset();
-    });
-
-    if (is_stopped()) return;
+    Debug(this, "Starting worker with id %llu", thread_id_.id);
     {
-      HandleScope handle_scope(isolate_);
-      Local<Context> context;
+      Locker locker(isolate_);
+      Isolate::Scope isolate_scope(isolate_);
+      SealHandleScope outer_seal(isolate_);
+
+      DeleteFnPtr<Environment, FreeEnvironment> env_;
+      auto cleanup_env = OnScopeLeave([&]() {
+        // TODO(addaleax): This call is harmless but should not be necessary.
+        // Figure out why V8 is raising a DCHECK() here without it
+        // (in test/parallel/test-async-hooks-worker-asyncfn-terminate-4.js).
+        isolate_->CancelTerminateExecution();
+
+        if (!env_) return;
+        env_->set_can_call_into_js(false);
+
+        {
+          Mutex::ScopedLock lock(mutex_);
+          stopped_ = true;
+          this->env_ = nullptr;
+        }
+        env_->SwapAddons(&addons);
+        env_.reset();
+      });
+
+      if (is_stopped()) return;
       {
-        // We create the Context object before we have an Environment* in place
-        // that we could use for error handling. If creation fails due to
-        // resource constraints, we need something in place to handle it,
-        // though.
-        TryCatch try_catch(isolate_);
-        if (snapshot_data_ != nullptr) {
-          context = Context::FromSnapshot(isolate_,
-                                          SnapshotData::kNodeBaseContextIndex)
-                        .ToLocalChecked();
-          if (!context.IsEmpty() &&
-              !InitializeContextRuntime(context).IsJust()) {
-            context = Local<Context>();
+        HandleScope handle_scope(isolate_);
+        Local<Context> context;
+        {
+          // We create the Context object before we have an Environment*in
+          // place that we could use for error handling. If creation fails due
+          // to resource constraints, we need something in place to handle it,
+          // though.
+          TryCatch try_catch(isolate_);
+          if (snapshot_data_ != nullptr) {
+            context = Context::FromSnapshot(isolate_,
+                                            SnapshotData::kNodeBaseContextIndex)
+                          .ToLocalChecked();
+            if (!context.IsEmpty() &&
+                !InitializeContextRuntime(context).IsJust()) {
+              context = Local<Context>();
+            }
+          } else {
+            context = NewContext(isolate_);
           }
-        } else {
-          context = NewContext(isolate_);
+          if (context.IsEmpty()) {
+            Exit(1, "ERR_WORKER_INIT_FAILED", "Failed to create new Context");
+            return;
+          }
         }
-        if (context.IsEmpty()) {
-          Exit(1, "ERR_WORKER_INIT_FAILED", "Failed to create new Context");
-          return;
-        }
-      }
 
-      if (is_stopped()) return;
-      CHECK(!context.IsEmpty());
-      Context::Scope context_scope(context);
-      {
-        env_.reset(CreateEnvironment(
-            data.isolate_data_.get(),
-            context,
-            std::move(argv_),
-            std::move(exec_argv_),
-            static_cast<EnvironmentFlags::Flags>(environment_flags_),
-            thread_id_,
-            std::move(inspector_parent_handle_)));
         if (is_stopped()) return;
-        CHECK_NOT_NULL(env_);
-        env_->set_env_vars(std::move(env_vars_));
-        SetProcessExitHandler(env_.get(), [this](Environment*, int exit_code) {
-          Exit(exit_code);
-        });
+        CHECK(!context.IsEmpty());
+        Context::Scope context_scope(context);
+        {
+          env_.reset(CreateEnvironment(
+              data.isolate_data_.get(),
+              context,
+              std::move(argv_),
+              std::move(exec_argv_),
+              static_cast<EnvironmentFlags::Flags>(environment_flags_),
+              thread_id_,
+              std::move(inspector_parent_handle_)));
+          if (is_stopped()) return;
+          CHECK_NOT_NULL(env_);
+          env_->set_env_vars(std::move(env_vars_));
+          SetProcessExitHandler(env_.get(),
+                                [this](Environment*, int exit_code) {
+                                  Exit(exit_code);
+                                });
+        }
+        {
+          Mutex::ScopedLock lock(mutex_);
+          if (stopped_) return;
+          this->env_ = env_.get();
+        }
+        Debug(this,
+              "Created Environment for worker with id %llu",
+              thread_id_.id);
+        if (is_stopped()) return;
+        {
+          if (!CreateEnvMessagePort(env_.get())) {
+            return;
+          }
+
+          Debug(this, "Created message port for worker %llu", thread_id_.id);
+          if (LoadEnvironment(env_.get(), StartExecutionCallback{}).IsEmpty())
+            return;
+
+          Debug(this, "Loaded environment for worker %llu", thread_id_.id);
+        }
       }
+
       {
+        Maybe<int> exit_code = SpinEventLoop(env_.get());
         Mutex::ScopedLock lock(mutex_);
-        if (stopped_) return;
-        this->env_ = env_.get();
-      }
-      Debug(this, "Created Environment for worker with id %llu", thread_id_.id);
-      if (is_stopped()) return;
-      {
-        if (!CreateEnvMessagePort(env_.get())) {
-          return;
+        if (exit_code_ == 0 && exit_code.IsJust()) {
+          exit_code_ = exit_code.FromJust();
         }
 
-        Debug(this, "Created message port for worker %llu", thread_id_.id);
-        if (LoadEnvironment(env_.get(), StartExecutionCallback{}).IsEmpty())
-          return;
-
-        Debug(this, "Loaded environment for worker %llu", thread_id_.id);
+        Debug(this, "Exiting thread for worker %llu with exit code %d",
+              thread_id_.id, exit_code_);
       }
     }
 
-    {
-      Maybe<int> exit_code = SpinEventLoop(env_.get());
-      Mutex::ScopedLock lock(mutex_);
-      if (exit_code_ == 0 && exit_code.IsJust()) {
-        exit_code_ = exit_code.FromJust();
-      }
-
-      Debug(this, "Exiting thread for worker %llu with exit code %d",
-            thread_id_.id, exit_code_);
-    }
+    Debug(this, "Worker %llu thread stops", thread_id_.id);
   }
-
-  Debug(this, "Worker %llu thread stops", thread_id_.id);
+  for (binding::DLib& addon : addons) {
+    addon.Close();
+  }
 }
 
 bool Worker::CreateEnvMessagePort(Environment* env) {
