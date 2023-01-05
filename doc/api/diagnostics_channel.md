@@ -417,6 +417,12 @@ independently.
 
 #### HTTP
 
+`http.server`
+
+* `server` {http.Server}
+
+Emitted when a http server is created.
+
 `http.client.request.start`
 
 * `request` {http.ClientRequest}
@@ -449,6 +455,12 @@ Emitted when server receives a request.
 Emitted when server sends a response.
 
 #### NET
+
+`net.server`
+
+* `server` {net.Server}
+
+Emitted when a net server is created.
 
 `net.client.socket`
 
@@ -493,6 +505,22 @@ added: v16.18.0
 * `worker` [`Worker`][]
 
 Emitted when a new thread is created.
+
+#### HTTPS
+
+`https.server`
+
+* `server` {https.Server}
+
+Emitted when a https server is created.
+
+#### TLS
+
+`tls.server`
+
+* `server` {tls.Server}
+
+Emitted when a tls server is created.
 
 [`'uncaughtException'`]: process.md#event-uncaughtexception
 [`Worker`]: worker_threads.md#class-worker
