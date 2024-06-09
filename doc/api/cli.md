@@ -357,6 +357,50 @@ Error: Access to this API has been restricted
 }
 ```
 
+### `--allow-net-udp`
+
+<!-- YAML
+added: REPLACEME
+-->
+
+> Stability: 1.1 - Active development
+
+When using the [Permission Model][], the process will not be able to bind and connect
+to any address by UDP socket by default. Attempts to do so will throw an
+`ERR_ACCESS_DENIED` unless the user explicitly passes the `--allow-net-udp` flag
+when starting Node.js.
+
+The valid arguments for the `--allow-net-udp` flag are:
+
+* `*` - To allow all UDP `bind` and `connect` operations.
+* Multiple addresses can be allowed.
+  Example `--allow-net-udp=127.0.0.1:8080 --allow-net-udp=127.0.0.1:9090`
+  Example `--allow-net-udp=127.0.0.1:8080,localhost:9090`
+
+Example:
+
+```js
+const dgram = require('node:dgram');
+dgram.createSocket('udp4').bind(9297, '127.0.0.1')
+```
+
+```console
+$ node --experimental-permission --allow-fs-read=./index.js index.js
+node:events:498
+      throw er; // Unhandled 'error' event
+      ^
+
+Error [ERR_ACCESS_DENIED]: Access to this API has been restricted. Permission: bind to 127.0.0.1/9297
+    at node:dgram:379:18
+    at process.processTicksAndRejections (node:internal/process/task_queues:77:11)
+Emitted 'error' event on Socket instance at:
+    at afterDns (node:dgram:337:12)
+    at node:dgram:379:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:77:11) {
+  code: 'ERR_ACCESS_DENIED'
+}
+```
+
 ### `--build-snapshot`
 
 <!-- YAML
@@ -1012,6 +1056,7 @@ following permissions are restricted:
 * Child Process - manageable through [`--allow-child-process`][] flag
 * Worker Threads - manageable through [`--allow-worker`][] flag
 * WASI - manageable through [`--allow-wasi`][] flag
+* UDP - manageable through [`--allow-net-udp`][] flag
 
 ### `--experimental-require-module`
 
@@ -2804,6 +2849,7 @@ one is included in the list below.
 * `--allow-child-process`
 * `--allow-fs-read`
 * `--allow-fs-write`
+* `--allow-net-udp`
 * `--allow-wasi`
 * `--allow-worker`
 * `--conditions`, `-C`
@@ -3356,6 +3402,7 @@ node --stack-trace-limit=12 -p -e "Error.stackTraceLimit" # prints 12
 [`--allow-child-process`]: #--allow-child-process
 [`--allow-fs-read`]: #--allow-fs-read
 [`--allow-fs-write`]: #--allow-fs-write
+[`--allow-net-udp`]: #--allow-net-udp
 [`--allow-wasi`]: #--allow-wasi
 [`--allow-worker`]: #--allow-worker
 [`--build-snapshot`]: #--build-snapshot
